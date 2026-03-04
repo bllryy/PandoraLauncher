@@ -36,7 +36,10 @@ pub fn open_delete_instance(
     window.open_dialog(cx, move |dialog, _, _| {
         let _ = &_input_subscription;
 
-        let content = match stage.load(Ordering::Relaxed) {
+        let stage_val = stage.load(Ordering::Relaxed);
+        let correct = correct_name.load(Ordering::Relaxed);
+
+        let content = match stage_val {
             0 => {
                 v_flex()
                     .child(Button::new("delete").label(ts!("instance.delete_dialog.label")).on_click({
@@ -62,7 +65,6 @@ pub fn open_delete_instance(
                     }))
             }
             2 => {
-                let correct = correct_name.load(Ordering::Relaxed);
                 // .div() and .child(div().h_2()) are workarounds for a weird layout bug
                 // where the Input would be set to its minimum width when confirm_message wrapped
                 div()
@@ -86,6 +88,18 @@ pub fn open_delete_instance(
         };
 
         dialog
+            .on_ok({
+                let backend_handle = backend_handle.clone();
+                move |_, _, _| {
+                    if stage_val != 2 || !correct {
+                        return false;
+                    }
+                    backend_handle.send(bridge::message::MessageToBackend::DeleteInstance {
+                        id: instance
+                    });
+                    true
+                }
+            })
             .title(title.clone())
             .child(content)
     });
