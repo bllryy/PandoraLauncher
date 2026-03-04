@@ -6,6 +6,7 @@ use gpui_component::{
     ActiveTheme as _, Disableable, Icon, InteractiveElementExt, WindowExt, button::{Button, ButtonVariants}, h_flex, input::{Input, InputState}, notification::{Notification, NotificationType}, resizable::{ResizablePanelEvent, ResizableState, h_resizable, resizable_panel}, scroll::ScrollableElement, sidebar::SidebarFooter, tooltip::Tooltip, v_flex
 };
 use rand::Rng;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -21,13 +22,14 @@ pub struct LauncherUI {
     sidebar_state: Entity<ResizableState>,
     default_sidebar_width: f32,
     recent_instances: heapless::Vec<(InstanceID, SharedString), 3>,
+    previous_pages: FxHashMap<PageType, LauncherPage>,
     _instance_added_subscription: Subscription,
     _instance_modified_subscription: Subscription,
     _instance_removed_subscription: Subscription,
     _instance_moved_to_top_subscription: Subscription,
 }
 
-#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, PartialEq, Eq, Deserialize, Serialize, Hash, PartialOrd, Ord)]
 #[serde(rename_all = "snake_case")]
 pub enum PageType {
     #[default]
@@ -72,13 +74,7 @@ pub enum LauncherPage {
     Modrinth(Entity<ModrinthSearchPage>),
     Import(Entity<ImportPage>),
     Syncing(Entity<SyncingPage>),
-    ModrinthProject {
-        project_id: SharedString,
-        project_title: SharedString,
-        install_for: Option<InstanceID>,
-        modrinth_page: Entity<ModrinthSearchPage>,
-        page: Entity<ModrinthProjectPage>,
-    },
+    ModrinthProject(Entity<ModrinthProjectPage>),
     InstancePage(Entity<InstancePage>),
 }
 
@@ -95,7 +91,7 @@ impl RenderOnce for LauncherPage {
             LauncherPage::Modrinth(entity) => process(entity, window, cx),
             LauncherPage::Import(entity) => process(entity, window, cx),
             LauncherPage::Syncing(entity) => process(entity, window, cx),
-            LauncherPage::ModrinthProject { page, .. } => process(page, window, cx),
+            LauncherPage::ModrinthProject(entity) => process(entity, window, cx),
             LauncherPage::InstancePage(entity) => process(entity, window, cx),
         };
 
@@ -195,13 +191,13 @@ impl LauncherUI {
             config.page_path = [].into();
         }
 
-        let page = match Self::create_page(&data, main_page.clone(), None, window, cx) {
+        let page = match Self::create_page(&data, main_page.clone(), window, cx) {
             Ok(page) => page,
             Err(page_type) => {
                 let config = InterfaceConfig::get_mut(cx);
                 config.main_page = page_type.clone();
                 config.page_path = [].into();
-                Self::create_page(&data, page_type, None, window, cx).unwrap()
+                Self::create_page(&data, page_type, window, cx).unwrap()
             },
         };
 
@@ -211,6 +207,7 @@ impl LauncherUI {
             sidebar_state,
             default_sidebar_width,
             recent_instances,
+            previous_pages: FxHashMap::default(),
             _instance_added_subscription,
             _instance_modified_subscription,
             _instance_removed_subscription,
@@ -218,12 +215,12 @@ impl LauncherUI {
         }
     }
 
-    fn create_page(data: &DataEntities, page: PageType, current_page: Option<&LauncherPage>, window: &mut Window, cx: &mut Context<Self>) -> Result<LauncherPage, PageType> {
+    fn create_page(data: &DataEntities, page: PageType, window: &mut Window, cx: &mut Context<Self>) -> Result<LauncherPage, PageType> {
         match page {
             PageType::Instances => {
                 Ok(LauncherPage::Instances(cx.new(|cx| InstancesPage::new(data, window, cx))))
             },
-            PageType::Modrinth { ref installing_for } => {
+            PageType::Modrinth { installing_for } => {
                 let installing_for = installing_for.as_ref().and_then(|name| InstanceEntries::find_id_by_name(&data.instances, name, cx));
 
                 let page = cx.new(|cx| {
@@ -237,33 +234,14 @@ impl LauncherUI {
             PageType::Syncing => {
                 Ok(LauncherPage::Syncing(cx.new(|cx| SyncingPage::new(data, window, cx))))
             },
-            PageType::ModrinthProject { ref project_id, ref project_title, ref install_for } => {
+            PageType::ModrinthProject { project_id, install_for, .. } => {
                 let install_for_id = install_for.as_ref().and_then(|name| InstanceEntries::find_id_by_name(&data.instances, name, cx));
 
-                let modrinth_page = match current_page {
-                    Some(LauncherPage::Modrinth(page)) => page.clone(),
-                    Some(LauncherPage::ModrinthProject { modrinth_page, .. }) => modrinth_page.clone(),
-                    _ => cx.new(|cx| ModrinthSearchPage::new(install_for_id, data, window, cx)),
-                };
-
                 let project_id = project_id.clone();
-                let project_title = project_title.clone();
-
-                Ok(LauncherPage::ModrinthProject {
-                    project_id: project_id.clone(),
-                    project_title: project_title.clone(),
-                    install_for: install_for_id,
-                    modrinth_page,
-                    page: cx.new(|cx| {
-                        ModrinthProjectPage::new(
-                            project_id,
-                            install_for_id,
-                            data,
-                            window,
-                            cx,
-                        )
-                    }),
-                })
+                let page = cx.new(|cx| {
+                    ModrinthProjectPage::new(project_id, install_for_id, data, window, cx,)
+                });
+                Ok(LauncherPage::ModrinthProject(page))
             },
             PageType::InstancePage { ref name } => {
                 let Some(id) = InstanceEntries::find_id_by_name(&data.instances, name, cx) else {
@@ -282,38 +260,31 @@ impl LauncherUI {
             return;
         }
 
-        if let PageType::Modrinth { installing_for } = &page {
-            if let LauncherPage::ModrinthProject { modrinth_page, install_for, .. } = &self.page {
-                let target_id = installing_for.as_ref()
-                    .and_then(|name| InstanceEntries::find_id_by_name(&self.data.instances, name, cx));
-
-                if target_id == *install_for {
-                    let modrinth_page = modrinth_page.clone();
-
-                    let config = InterfaceConfig::get_mut(cx);
-                    config.main_page = page.clone();
-                    config.page_path = page_path.into();
-
-                    self.page = LauncherPage::Modrinth(modrinth_page);
-                    cx.notify();
-                    return;
-                }
-            }
-        }
-
         let config = InterfaceConfig::get_mut(cx);
+        let previous_page_type = std::mem::replace(&mut config.main_page, page.clone());
         config.main_page = page.clone();
         config.page_path = page_path.into();
 
-        match Self::create_page(&self.data, page, Some(&self.page), window, cx) {
+        if let Some(previous_page) = self.previous_pages.remove(&page) {
+            self.page = previous_page;
+            self.previous_pages.retain(|k, _| page_path.contains(k));
+            return;
+        }
+
+        match Self::create_page(&self.data, page, window, cx) {
             Ok(page) => {
-                self.page = page;
+                let previous_page = std::mem::replace(&mut self.page, page);
+                if page_path.contains(&previous_page_type) {
+                    self.previous_pages.insert(previous_page_type, previous_page);
+                }
+                self.previous_pages.retain(|k, _| page_path.contains(k));
             },
             Err(fallback) => {
                 let config = InterfaceConfig::get_mut(cx);
                 config.main_page = fallback.clone();
                 config.page_path = [].into();
-                self.page = Self::create_page(&self.data, fallback, None, window, cx).unwrap();
+                self.previous_pages.clear();
+                self.page = Self::create_page(&self.data, fallback, window, cx).unwrap();
             },
         }
 
