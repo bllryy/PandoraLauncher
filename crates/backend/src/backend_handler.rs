@@ -6,7 +6,7 @@ use bridge::{
 };
 use futures::TryFutureExt;
 use rustc_hash::FxHashSet;
-use schema::{auxiliary::AuxiliaryContentMeta, content::ContentSource, minecraft_profile::MinecraftProfileResponse, modrinth::ModrinthLoader, version::{LaunchArgument, LaunchArgumentValue}};
+use schema::{auxiliary::AuxiliaryContentMeta, content::ContentSource, curseforge::{CurseforgeGetModFilesRequest, CurseforgeModLoaderType}, minecraft_profile::MinecraftProfileResponse, modrinth::ModrinthLoader, version::{LaunchArgument, LaunchArgumentValue}};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 use tokio::{io::AsyncBufReadExt, sync::{Semaphore, TryAcquireError}};
@@ -14,7 +14,7 @@ use ustr::Ustr;
 use uuid::Uuid;
 
 use crate::{
-    BackendState, CachedMinecraftProfile, LoginError, account::BackendAccount, arcfactory::ArcStrFactory, instance::ContentFolder, launch::{ArgumentExpansionKey, LaunchError}, log_reader, metadata::{items::{AssetsIndexMetadataItem, FabricLoaderManifestMetadataItem, ForgeInstallerMavenMetadataItem, MinecraftVersionManifestMetadataItem, MinecraftVersionMetadataItem, ModrinthProjectMetadataItem, ModrinthProjectVersionsMetadataItem, ModrinthSearchMetadataItem, ModrinthV3VersionUpdateMetadataItem, ModrinthVersionUpdateMetadataItem, MojangJavaRuntimeComponentMetadataItem, MojangJavaRuntimesMetadataItem, NeoforgeInstallerMavenMetadataItem, VersionUpdateParameters, VersionV3LoaderFields, VersionV3UpdateParameters}, manager::MetaLoadError}, mod_metadata::{ContentUpdateAction, ContentUpdateKey}, skin_manager::SkinManager
+    BackendState, CachedMinecraftProfile, LoginError, account::BackendAccount, arcfactory::ArcStrFactory, instance::ContentFolder, launch::{ArgumentExpansionKey, LaunchError}, log_reader, metadata::{items::{AssetsIndexMetadataItem, CurseforgeGetModFilesMetadataItem, CurseforgeSearchMetadataItem, FabricLoaderManifestMetadataItem, ForgeInstallerMavenMetadataItem, MinecraftVersionManifestMetadataItem, MinecraftVersionMetadataItem, ModrinthProjectMetadataItem, ModrinthProjectVersionsMetadataItem, ModrinthSearchMetadataItem, ModrinthV3VersionUpdateMetadataItem, ModrinthVersionUpdateMetadataItem, MojangJavaRuntimeComponentMetadataItem, MojangJavaRuntimesMetadataItem, NeoforgeInstallerMavenMetadataItem, VersionUpdateParameters, VersionV3LoaderFields, VersionV3UpdateParameters}, manager::MetaLoadError}, mod_metadata::{ContentUpdateAction, ContentUpdateKey}, skin_manager::SkinManager
 };
 
 impl BackendState {
@@ -52,6 +52,14 @@ impl BackendState {
                         bridge::meta::MetadataRequest::ModrinthProject(ref project) => {
                             let (result, handle) = meta.fetch_with_keepalive(&ModrinthProjectMetadataItem(project), force_reload).await;
                             (result.map(MetadataResult::ModrinthProjectResult), handle)
+                        },
+                        bridge::meta::MetadataRequest::CurseforgeSearch(ref search) => {
+                            let (result, handle) = meta.fetch_with_keepalive(&CurseforgeSearchMetadataItem(search), force_reload).await;
+                            (result.map(MetadataResult::CurseforgeSearchResult), handle)
+                        },
+                        bridge::meta::MetadataRequest::CurseforgeGetModFiles(ref request) => {
+                            let (result, handle) = meta.fetch_with_keepalive(&CurseforgeGetModFilesMetadataItem(request), force_reload).await;
+                            (result.map(MetadataResult::CurseforgeGetModFilesResult), handle)
                         },
                     };
                     let result = result.map_err(|err| format!("{}", err).into());
@@ -530,7 +538,7 @@ impl BackendState {
                                     if let ContentSource::ModrinthProject { ref project } = source {
                                         if &result.0.project_id != project {
                                             log::error!("Refusing to update {:?}, mismatched project ids: expected {}, got {}",
-                                                summary.content_summary.hash, &result.0.project_id, &project);
+                                                summary.content_summary.hash, project, &result.0.project_id);
                                             return Ok(ContentUpdateAction::ErrorNotFound);
                                         }
                                     }
@@ -556,6 +564,70 @@ impl BackendState {
                                         })
                                     }
                                 },
+                                ContentSource::CurseforgeProject { project_id } => {
+                                    let permit = semaphore.acquire().await.unwrap();
+
+                                    let mod_loader_type = match summary.content_summary.extra {
+                                        ContentType::Fabric => {
+                                            Some(CurseforgeModLoaderType::Fabric as u32)
+                                        },
+                                        ContentType::Forge | ContentType::LegacyForge => {
+                                            Some(CurseforgeModLoaderType::Forge as u32)
+                                        },
+                                        ContentType::NeoForge => {
+                                            Some(CurseforgeModLoaderType::NeoForge as u32)
+                                        },
+                                        _ => None
+                                    };
+
+                                    let result = self.meta.fetch(&CurseforgeGetModFilesMetadataItem(&CurseforgeGetModFilesRequest {
+                                        mod_id: project_id,
+                                        game_version: Some(version),
+                                        mod_loader_type,
+                                        page_size: Some(1)
+                                    })).await;
+
+                                    drop(permit);
+
+                                    tracker.add_count(1);
+                                    tracker.notify();
+
+                                    if let Err(MetaLoadError::NonOK(404)) = result {
+                                        return Ok(ContentUpdateAction::ErrorNotFound);
+                                    }
+
+                                    let result = result?;
+
+                                    let Some(file) = result.data.first() else {
+                                        return Ok(ContentUpdateAction::ErrorNotFound);
+                                    };
+
+                                    if file.mod_id != project_id {
+                                        log::error!("Refusing to update {:?}, mismatched project ids: expected {}, got {}",
+                                            summary.content_summary.hash, project_id, file.mod_id);
+                                        return Ok(ContentUpdateAction::ErrorNotFound);
+                                    }
+
+                                    let sha1 = file.hashes.iter()
+                                        .find(|hash| hash.algo == 1).map(|hash| &hash.value);
+                                    let Some(sha1) = sha1 else {
+                                        return Ok(ContentUpdateAction::ErrorInvalidHash);
+                                    };
+
+                                    let mut latest_hash = [0u8; 20];
+                                    let Ok(_) = hex::decode_to_slice(&**sha1, &mut latest_hash) else {
+                                        return Ok(ContentUpdateAction::ErrorInvalidHash);
+                                    };
+
+                                    if latest_hash == summary.content_summary.hash {
+                                        Ok(ContentUpdateAction::AlreadyUpToDate)
+                                    } else {
+                                        Ok(ContentUpdateAction::Curseforge {
+                                            file: file.clone(),
+                                            project_id,
+                                        })
+                                    }
+                                }
                             }
                         }.map_ok(|action| UpdateResult {
                             mod_summary: summary.content_summary.clone(),
@@ -657,6 +729,37 @@ impl BackendState {
                                         size: file.size,
                                     },
                                     content_source: ContentSource::ModrinthProject { project: project_id },
+                                }].into(),
+                            }
+                        },
+                        ContentUpdateAction::Curseforge { file, project_id } => {
+                            let mut path = mod_summary.path.with_file_name(&*file.file_name);
+                            if !mod_summary.enabled {
+                                path.add_extension("disabled");
+                            }
+                            debug_assert!(path.is_absolute());
+
+                            let sha1 = file.hashes.iter()
+                                .find(|hash| hash.algo == 1).map(|hash| &hash.value);
+                            let Some(sha1) = sha1 else {
+                                self.send.send_error("Can't update mod in instance, missing sha1 hash");
+                                modal_action.set_finished();
+                                return;
+                            };
+
+                            ContentInstall {
+                                target: InstallTarget::Instance(id),
+                                loader_hint: loader,
+                                version_hint: Some(minecraft_version.into()),
+                                files: [ContentInstallFile {
+                                    replace_old: Some(mod_summary.path.clone()),
+                                    path: bridge::install::ContentInstallPath::Raw(path.into()),
+                                    download: ContentDownload::Url {
+                                        url: file.download_url.clone(),
+                                        sha1: sha1.clone(),
+                                        size: file.file_length as usize,
+                                    },
+                                    content_source: ContentSource::CurseforgeProject { project_id },
                                 }].into(),
                             }
                         },

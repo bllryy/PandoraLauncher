@@ -7,7 +7,7 @@ use bridge::{
 use gpui::{prelude::*, *};
 use gpui_component::select::SelectItem;
 use indexmap::IndexMap;
-use schema::{instance::InstanceConfiguration, loader::Loader};
+use schema::instance::InstanceConfiguration;
 
 pub struct InstanceEntries {
     pub entries: IndexMap<InstanceID, Entity<InstanceEntry>>,

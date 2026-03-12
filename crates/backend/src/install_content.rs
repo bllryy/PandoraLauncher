@@ -4,16 +4,16 @@ use bridge::{
     install::{ContentInstall, ContentInstallFile, ContentInstallPath}, instance::{ContentType, ContentSummary}, modal_action::{ModalAction, ProgressTracker, ProgressTrackerFinishType}, safe_path::SafePath
 };
 use reqwest::StatusCode;
-use schema::{content::ContentSource, loader::Loader, modrinth::{ModrinthLoader, ModrinthProjectVersionsRequest}};
+use schema::{content::ContentSource, curseforge::{CurseforgeGetModFilesRequest, CurseforgeModLoaderType}, loader::Loader, modrinth::{ModrinthLoader, ModrinthProjectVersionsRequest}};
 use sha1::{Digest, Sha1};
 use tokio::io::AsyncWriteExt;
 
-use crate::{lockfile::Lockfile, metadata::{items::{MinecraftVersionManifestMetadataItem, ModrinthProjectVersionsMetadataItem, ModrinthVersionMetadataItem}, manager::MetaLoadError}, BackendState};
+use crate::{BackendState, lockfile::Lockfile, metadata::{items::{CurseforgeGetModFilesMetadataItem, MinecraftVersionManifestMetadataItem, ModrinthProjectVersionsMetadataItem, ModrinthVersionMetadataItem}, manager::MetaLoadError}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ContentInstallError {
-    #[error("Unable to find appropriate version for dependency")]
-    UnableToFindDependencyVersion,
+    #[error("Unable to find appropriate version")]
+    UnableToFindVersion,
     #[error("Unable to determine content type (mod, resourcepack, etc.) for file: {0}")]
     UnableToDetermineContentType(Arc<str>),
     #[error("Invalid filename: {0}")]
@@ -26,6 +26,8 @@ pub enum ContentInstallError {
     WrongFilesize,
     #[error("Downloaded file had the wrong hash")]
     WrongHash,
+    #[error("Missing required sha1 hash")]
+    MissingHash,
     #[error("Hash isn't a valid sha1 hash:\n{0}")]
     InvalidHash(Arc<str>),
     #[error("Failed to perform I/O operation:\n{0}")]
@@ -176,8 +178,80 @@ impl BackendState {
                                 mod_summary
                             })
                         } else {
-                            Err(ContentInstallError::UnableToFindDependencyVersion)
+                            Err(ContentInstallError::UnableToFindVersion)
                         }
+                    },
+                    bridge::install::ContentDownload::Curseforge { project_id } => {
+                        let versions = self.meta.fetch(&CurseforgeGetModFilesMetadataItem(&CurseforgeGetModFilesRequest {
+                            mod_id: project_id,
+                            game_version: content.version_hint.clone().map(|v| v.into()),
+                            mod_loader_type: match content.loader_hint {
+                                Loader::Vanilla => None,
+                                Loader::Fabric => Some(CurseforgeModLoaderType::Fabric as u32),
+                                Loader::Forge => Some(CurseforgeModLoaderType::Forge as u32),
+                                Loader::NeoForge => Some(CurseforgeModLoaderType::NeoForge as u32),
+                                Loader::Unknown => None,
+                            },
+                            page_size: Some(1)
+                        })).await?;
+
+                        let Some(file) = versions.data.first() else {
+                            return Err(ContentInstallError::UnableToFindVersion);
+                        };
+
+                        if file.mod_id != project_id {
+                            return Err(ContentInstallError::MismatchedProjectIdForVersion(
+                                file.file_name.clone(),
+                                format!("{}", project_id.clone()).into(),
+                                format!("{}", file.mod_id).into()
+                            ));
+                        }
+
+                        let url = &file.download_url;
+                        let sha1 = file.hashes.iter()
+                            .find(|hash| hash.algo == 1).map(|hash| &hash.value);
+                        let size = file.file_length as usize;
+
+                        let Some(sha1) = sha1 else {
+                            return Err(ContentInstallError::MissingHash)
+                        };
+
+                        let Some(safe_filename) = SafePath::new(&file.file_name) else {
+                            return Err(ContentInstallError::InvalidFilename(file.file_name.clone()));
+                        };
+
+                        let (path, hash, mod_summary) = self.download_file_into_library(&modal_action,
+                            (&safe_filename).into(), url, sha1, size, &semaphore).await?;
+
+                        let install_path = match &content_file.path {
+                            ContentInstallPath::Raw(path) => path.clone(),
+                            ContentInstallPath::Safe(safe_path) => safe_path.to_path(Path::new("")).into(),
+                            ContentInstallPath::Automatic => {
+                                let base = if let Some(mod_summary) = &mod_summary {
+                                    match mod_summary.extra {
+                                        ContentType::Fabric | ContentType::Forge | ContentType::LegacyForge | ContentType::NeoForge | ContentType::JavaModule | ContentType::ModrinthModpack { .. } => {
+                                            Path::new("mods")
+                                        },
+                                        ContentType::ResourcePack => {
+                                            Path::new("resourcepacks")
+                                        }
+                                    }
+                                } else {
+                                    return Err(ContentInstallError::UnableToDetermineContentType(file.file_name.clone()))
+                                };
+
+                                safe_filename.to_path(base).into()
+                            },
+                        };
+
+                        Ok(InstallFromContentLibrary {
+                            from: path,
+                            replace: content_file.replace_old.clone(),
+                            hash,
+                            install_path,
+                            content_file: content_file.clone(),
+                            mod_summary
+                        })
                     },
                     bridge::install::ContentDownload::Url { ref url, ref sha1, size } => {
                         let name = match &content_file.path {

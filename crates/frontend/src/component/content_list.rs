@@ -1,5 +1,5 @@
 use std::{hash::{DefaultHasher, Hash, Hasher}, sync::{
-    atomic::{AtomicUsize, Ordering}, Arc
+    Arc, atomic::{AtomicUsize, Ordering}
 }};
 
 use bridge::{
@@ -133,7 +133,8 @@ impl ContentListDelegate {
             }))
         };
 
-        let update_button = match summary.update.status_if_matches(self.for_loader, self.for_version) {
+        let status = summary.update.status_if_matches(self.for_loader, self.for_version);
+        let update_button = match status {
             bridge::instance::ContentUpdateStatus::Unknown => None,
             bridge::instance::ContentUpdateStatus::ManualInstall => Some(
                 Button::new(("update", element_id)).warning().icon(PandoraIcon::FileQuestionMark)
@@ -151,11 +152,18 @@ impl ContentListDelegate {
                 Button::new(("update", element_id)).icon(PandoraIcon::Check)
                     .tooltip(ts!("instance.content.update.check.last_up_to_date"))
             ),
-            bridge::instance::ContentUpdateStatus::Modrinth => {
+            bridge::instance::ContentUpdateStatus::Modrinth | bridge::instance::ContentUpdateStatus::Curseforge => {
+                let tooltip = match status {
+                    bridge::instance::ContentUpdateStatus::Modrinth => ts!("instance.content.update.download.from_modrinth"),
+                    bridge::instance::ContentUpdateStatus::Curseforge => ts!("instance.content.update.download.from_curseforge"),
+                    _ => unreachable!()
+                };
+
                 let loading = self.updating.lock().contains(&element_id);
                 Some(
                     Button::new(("update", element_id)).success().loading(loading).icon(PandoraIcon::Download)
-                        .tooltip(ts!("instance.content.update.download.from_modrinth")).on_click({
+                        .tooltip(tooltip)
+                        .on_click({
                             let backend_handle = self.backend_handle.clone();
                             let updating = self.updating.clone();
                             cx.listener(move |this, _, window, cx| {

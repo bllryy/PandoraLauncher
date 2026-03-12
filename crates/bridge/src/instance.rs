@@ -108,6 +108,7 @@ pub enum ContentUpdateStatus {
     ErrorInvalidHash,
     AlreadyUpToDate,
     Modrinth,
+    Curseforge
 }
 
 impl ContentUpdateStatus {

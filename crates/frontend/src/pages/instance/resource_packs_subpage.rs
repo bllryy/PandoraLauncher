@@ -9,7 +9,7 @@ use gpui::{prelude::*, *};
 use gpui_component::{
     ActiveTheme as _, Sizable, WindowExt, button::{Button, ButtonVariants}, h_flex, input::SelectAll, list::ListState, notification::{Notification, NotificationType}, v_flex
 };
-use schema::{content::ContentSource, loader::Loader, modrinth::ModrinthProjectType};
+use schema::{content::ContentSource, curseforge::CurseforgeClassId, loader::Loader, modrinth::ModrinthProjectType};
 use ustr::Ustr;
 
 use crate::{component::content_list::ContentListDelegate, entity::instance::InstanceEntry, interface_config::InterfaceConfig, root, ts, ui::PageType};
@@ -114,6 +114,15 @@ impl Render for InstanceResourcePacksSubpage {
                 move |_, window, cx| {
                     let page = crate::ui::PageType::Modrinth { installing_for: Some(instance_name.clone()) };
                     InterfaceConfig::get_mut(cx).modrinth_page_project_type = ModrinthProjectType::Resourcepack;
+                    let path = &[PageType::Instances, PageType::InstancePage { name: instance_name.clone() }];
+                    root::switch_page(page, path, window, cx);
+                }
+            }))
+            .child(Button::new("addcf").label(ts!("instance.content.install.from_curseforge")).success().compact().small().on_click({
+                let instance_name = self.instance_name.clone();
+                move |_, window, cx| {
+                    let page = crate::ui::PageType::Curseforge { installing_for: Some(instance_name.clone()) };
+                    InterfaceConfig::get_mut(cx).curseforge_page_class_id = CurseforgeClassId::Resourcepack;
                     let path = &[PageType::Instances, PageType::InstancePage { name: instance_name.clone() }];
                     root::switch_page(page, path, window, cx);
                 }
