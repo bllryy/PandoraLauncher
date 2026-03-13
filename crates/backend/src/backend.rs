@@ -252,8 +252,18 @@ impl BackendState {
 
             let path = entry.path();
 
+            let Some(file_name) = path.file_name() else {
+                continue;
+            };
+            if file_name.as_encoded_bytes()[0] == b'.' {
+                continue;
+            }
+
             let mut time = SystemTime::UNIX_EPOCH;
-            if let Ok(metadata) = path.metadata() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    return;
+                }
                 if let Ok(created) = metadata.created() {
                     time = time.max(created);
                 }
