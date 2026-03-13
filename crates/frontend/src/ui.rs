@@ -603,7 +603,7 @@ impl Render for LauncherUI {
         let footer_buttons = h_flex().child(settings_button).child(bug_report_button);
         let footer = v_flex().pb_2().px_2().items_center().w_full().child(footer_buttons).child(account_button);
         let sidebar = v_flex()
-            .w_full()
+            .size_full()
             .bg(cx.theme().sidebar)
             .text_color(cx.theme().sidebar_foreground)
             .when(cfg!(target_os = "macos"), |this| {
