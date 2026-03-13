@@ -296,8 +296,8 @@ system:
 account:
   title:
     en: Accounts
-  single:
-    en: Account
+  override_account:
+    en: Override Account
   none:
     en: No Account
   name:
