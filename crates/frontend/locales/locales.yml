@@ -358,6 +358,8 @@ instance:
   view:
     en: View
   kill:
+    en: Kill
+  kill_instance:
     en: Kill Instance
   delete:
     en: Delete this instance

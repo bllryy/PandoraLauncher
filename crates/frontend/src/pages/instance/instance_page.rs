@@ -67,7 +67,7 @@ impl Page for InstancePage {
                     .child(Button::new("kill_instance")
                         .danger()
                         .icon(PandoraIcon::Close)
-                        .label(ts!("instance.kill"))
+                        .label(ts!("instance.kill_instance"))
                         .on_click({
                             let backend_handle = backend_handle.clone();
                             move |_, _, _| {
