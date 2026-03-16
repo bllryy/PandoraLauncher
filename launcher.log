@@ -1,0 +1,69 @@
+[2026-03-16T03:33:06Z DEBUG pandora_launcher] DEBUG logging enabled
+[2026-03-16T03:33:06Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher" as RootDir
+[2026-03-16T03:33:06Z INFO backend::launch_wrapper] Writing launch wrapper jar to "/home/lily/.local/share/PandoraLauncher/temp/LaunchWrapper-8146b9519cdfeece3268c6d86d43e97d3a2408a9.jar"
+[2026-03-16T03:33:06Z DEBUG backend::backend] Doing initial backend load
+[2026-03-16T03:33:06Z INFO backend::backend] Loading all instances
+[2026-03-16T03:33:06Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances" as InstancesDir
+[2026-03-16T03:33:06Z INFO backend::backend] Starting backend
+[2026-03-16T03:33:06Z DEBUG backend::metadata::manager] Loading metadata MinecraftVersionManifestMetadataItem
+[2026-03-16T03:33:14Z INFO backend::backend] Creating instance 1.21.11
+[2026-03-16T03:33:14Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances" as InstancesDir
+[2026-03-16T03:33:14Z INFO backend::instance] Loading instance from "/home/lily/.local/share/PandoraLauncher/instances/1.21.11"
+[2026-03-16T03:33:14Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11" as InstanceDir { id: InstanceID { index: 0, generation: 0 } }
+[2026-03-16T03:33:17Z INFO backend::backend] Starting login
+[2026-03-16T03:33:17Z DEBUG backend::backend] Auth Flow: Initial
+[2026-03-16T03:33:17Z DEBUG backend::backend] Starting serve_redirect server
+[2026-03-16T03:33:17Z INFO auth::serve_redirect] Starting auth redirect server on 127.0.0.1:3160
+[2026-03-16T03:33:17Z INFO auth::serve_redirect] Successfully started listening on 127.0.0.1:3160
+[2026-03-16T03:33:17Z INFO auth::serve_redirect] Waiting for a new connection
+[2026-03-16T03:38:16Z INFO auth::serve_redirect] Got a new connection
+[2026-03-16T03:38:16Z DEBUG auth::serve_redirect] Resizing read buffer from 1024 to 2048
+[2026-03-16T03:38:16Z INFO auth::serve_redirect] Successfully received and parsed http request
+[2026-03-16T03:38:16Z DEBUG backend::backend] serve_redirect handled successfully
+[2026-03-16T03:38:16Z DEBUG backend::backend] Finishing authorization, getting msa tokens
+[2026-03-16T03:38:17Z DEBUG backend::backend] Auth Flow: MsaAccess
+[2026-03-16T03:38:18Z DEBUG backend::backend] Auth Flow: XboxLive
+[2026-03-16T03:38:18Z DEBUG backend::backend] Auth Flow: XboxSecure
+[2026-03-16T03:38:18Z DEBUG backend::backend] Auth Flow: AccessToken
+[2026-03-16T03:38:18Z INFO backend::skin_manager] Downloading skin from http://textures.minecraft.net/texture/36d10a4b9278bd11c7d0ef2f773049ef482afcde46d0f877bde32c2251c4f816
+[2026-03-16T03:38:18Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft" as InstanceDotMinecraftDir { id: InstanceID { index: 0, generation: 0 } }
+[2026-03-16T03:38:18Z INFO backend::instance] Loading all content from "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft/mods"
+[2026-03-16T03:38:18Z INFO backend::launch] Launching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft"
+[2026-03-16T03:38:18Z DEBUG backend::launch] Creating launch version
+[2026-03-16T03:38:18Z DEBUG backend::metadata::manager] Loading metadata MinecraftVersionMetadataItem(MinecraftVersionLink { id: u!("1.21.11"), type: Release, url: u!("https://piston-meta.mojang.com/v1/packages/db211d8c41e766dbcdce51c6fddeb9fb417337de/1.21.11.json"), time: 2026-03-13T06:38:35Z, release_time: 2025-12-09T12:23:30Z, sha1: u!("db211d8c41e766dbcdce51c6fddeb9fb417337de"), compliance_level: 1 })
+[2026-03-16T03:38:18Z DEBUG backend::metadata::manager] Loading metadata FabricLoaderManifestMetadataItem
+[2026-03-16T03:38:18Z INFO backend::skin_manager] Successfully downloaded skin from http://textures.minecraft.net/texture/36d10a4b9278bd11c7d0ef2f773049ef482afcde46d0f877bde32c2251c4f816
+[2026-03-16T03:38:18Z DEBUG backend::metadata::manager] Loading metadata FabricLaunchMetadataItem { minecraft_version: u!("1.21.11"), loader_version: u!("0.18.4") }
+[2026-03-16T03:38:18Z DEBUG backend::launch] Loading java, assets, libraries and log configuration
+[2026-03-16T03:38:18Z DEBUG backend::metadata::manager] Loading metadata MojangJavaRuntimesMetadataItem
+[2026-03-16T03:38:18Z DEBUG backend::metadata::manager] Loading metadata AssetsIndexMetadataItem { url: u!("https://piston-meta.mojang.com/v1/packages/863d838501cf9d9859d852ddbc6c7673fce00e56/29.json"), cache: "/home/lily/.local/share/PandoraLauncher/assets/indexes/29.json", hash: u!("863d838501cf9d9859d852ddbc6c7673fce00e56") }
+[2026-03-16T03:38:19Z DEBUG backend::metadata::manager] Loading metadata MojangJavaRuntimeComponentMetadataItem { url: u!("https://piston-meta.mojang.com/v1/packages/06a3884df3d9d4072b9b6df541495d81878ad2de/manifest.json"), cache: "/home/lily/.local/share/PandoraLauncher/runtime/java-runtime-delta/linux/manifest.json", hash: u!("06a3884df3d9d4072b9b6df541495d81878ad2de") }
+[2026-03-16T03:38:23Z ERROR backend::backend_handler] Failed to launch due to error: LoadJavaRuntimeError(Reqwest(reqwest::Error { kind: Decode, source: hyper::Error(Body, Error { kind: Io(Kind(ConnectionReset)) }) }))
+[2026-03-16T03:38:23Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft" as InstanceDotMinecraftDir { id: InstanceID { index: 0, generation: 0 } }
+[2026-03-16T03:38:37Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft" as InstanceDotMinecraftDir { id: InstanceID { index: 0, generation: 0 } }
+[2026-03-16T03:38:37Z INFO backend::instance] Loading all content from "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft/mods"
+[2026-03-16T03:38:37Z INFO backend::launch] Launching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft"
+[2026-03-16T03:38:37Z DEBUG backend::launch] Creating launch version
+[2026-03-16T03:38:37Z DEBUG backend::metadata::manager] Loading metadata MinecraftVersionManifestMetadataItem
+[2026-03-16T03:38:37Z DEBUG backend::launch] Loading java, assets, libraries and log configuration
+[2026-03-16T03:38:49Z ERROR backend::backend_handler] Failed to launch due to error: LoadAssetObjectsError(Reqwest(reqwest::Error { kind: Request, url: "https://resources.download.minecraft.net/7a/7aedafe8cb5db98bba1139f3d6fe90881549f792", source: hyper_util::client::legacy::Error(SendRequest, hyper::Error(Io, Kind(ConnectionReset))) }))
+[2026-03-16T03:38:56Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft" as InstanceDotMinecraftDir { id: InstanceID { index: 0, generation: 0 } }
+[2026-03-16T03:38:56Z INFO backend::launch] Launching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11/.minecraft"
+[2026-03-16T03:38:56Z DEBUG backend::launch] Creating launch version
+[2026-03-16T03:38:56Z DEBUG backend::launch] Loading java, assets, libraries and log configuration
+[2026-03-16T03:38:58Z ERROR backend::backend_handler] Failed to launch due to error: LoadAssetObjectsError(Reqwest(reqwest::Error { kind: Request, url: "https://resources.download.minecraft.net/3b/3b9446150e77c47485d9aa943b72ffc9a2263ae5", source: hyper_util::client::legacy::Error(SendRequest, hyper::Error(Io, Kind(ConnectionReset))) }))
+[2026-03-16T03:39:44Z INFO backend::backend] Creating instance test
+[2026-03-16T03:39:44Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances" as InstancesDir
+[2026-03-16T03:39:44Z INFO backend::instance] Loading instance from "/home/lily/.local/share/PandoraLauncher/instances/test"
+[2026-03-16T03:39:44Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/test" as InstanceDir { id: InstanceID { index: 1, generation: 1 } }
+[2026-03-16T03:39:45Z INFO backend::launch] Launching "/home/lily/.local/share/PandoraLauncher/instances/test/.minecraft"
+[2026-03-16T03:39:45Z DEBUG backend::launch] Creating launch version
+[2026-03-16T03:39:45Z DEBUG backend::launch] Loading java, assets, libraries and log configuration
+[2026-03-16T03:39:51Z INFO backend::launch] Launching game process
+[2026-03-16T03:42:46Z DEBUG backend::backend] Child process 132898 is no longer alive
+[2026-03-16T03:43:10Z INFO backend::instance] Loading instance from "/home/lily/.local/share/PandoraLauncher/instances/1.21.11 after anticheat"
+[2026-03-16T03:43:10Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11 after anticheat" as InstanceDir { id: InstanceID { index: 2, generation: 2 } }
+[2026-03-16T03:43:10Z INFO backend::instance] Loading instance from "/home/lily/.local/share/PandoraLauncher/instances/taun 1.21.11"
+[2026-03-16T03:43:10Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/taun 1.21.11" as InstanceDir { id: InstanceID { index: 3, generation: 3 } }
+[2026-03-16T03:43:10Z INFO backend::instance] Loading instance from "/home/lily/.local/share/PandoraLauncher/instances/1.21.11 after anticheat 2"
+[2026-03-16T03:43:10Z DEBUG backend::backend] Watching "/home/lily/.local/share/PandoraLauncher/instances/1.21.11 after anticheat 2" as InstanceDir { id: InstanceID { index: 4, generation: 4 } }
